@@ -84,12 +84,12 @@ namespace BenchmarkAPI.DAL
             {
                 entity.Property(e => e.ProductId).HasDefaultValueSql("(newid())");
 
-                entity.Property(e => e.CreateBy)
+                entity.Property(e => e.CreatedBy)
                     .HasMaxLength(50)
                     .IsUnicode(false)
                     .HasDefaultValueSql("(original_login())");
 
-                entity.Property(e => e.CreateDate)
+                entity.Property(e => e.CreatedDate)
                     .HasColumnType("datetime")
                     .HasDefaultValueSql("(getdate())");
 
@@ -111,12 +111,12 @@ namespace BenchmarkAPI.DAL
                     .HasMaxLength(100)
                     .IsUnicode(false);
 
-                entity.Property(e => e.UpdateBy)
+                entity.Property(e => e.UpdatedBy)
                     .HasMaxLength(50)
                     .IsUnicode(false)
                     .HasDefaultValueSql("(original_login())");
 
-                entity.Property(e => e.UpdateDate)
+                entity.Property(e => e.UpdatedDate)
                     .HasColumnType("datetime")
                     .HasDefaultValueSql("(getdate())");
 

@@ -14,90 +14,173 @@ namespace BenchmarkAPI.Controllers
     public class MaterialsController : ControllerBase
     {
         private readonly ProductsDbContext _context;
-        public MaterialsController(ProductsDbContext context)
+        private ILogger<ProductsController> _logger;
+
+
+        public MaterialsController(ILogger<ProductsController> logger, ProductsDbContext context)
         {
+            _logger = logger;
             _context = context;
         }
 
-        // GET: api/Materials
+ 
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Material>>> GetMaterials()
         {
-          if (_context.Materials == null)
-          {
-              return NotFound();
-          }
-            return await _context.Materials.ToListAsync();
+            var allmaterials = _context.Materials.Where(p => p.IsDeleted == false && p.IsActive == true)
+                .Include(o => o.ProductsMaterialOptions).ToListAsync();
+            return await allmaterials;
         }
 
-        // GET: api/Materials/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Material>> GetMaterial(Guid id)
+ 
+        [HttpGet("{name}")]
+        public async Task<ActionResult<IEnumerable<Material>>> GetMaterialByName(string name)
         {
-          if (_context.Materials == null)
-          {
-              return NotFound();
-          }
-            var material = await _context.Materials.FindAsync(id);
-
-            if (material == null)
+            if (string.IsNullOrEmpty(name))
             {
-                return NotFound();
+                _logger.LogError($"Name is empty ");
             }
 
-            return material;
-        }
 
-        // PUT: api/Materials/5
-
-        [HttpPut()]
-        public async Task<IActionResult> PutMaterial(Guid id, Material material)
-        {
-            if (id != material.MaterialId)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(material).State = EntityState.Modified;
-
+            var result1 = (from p in _context.Materials
+                           where p.MaterialName == name && p.IsDeleted == false && p.IsActive != false
+                           select p);
             try
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!MaterialExists(id))
+                var res = MaterialExists(name);
+
+                if (res != true)
                 {
-                    return NotFound();
+                    _logger.LogError($"Product with  MaterialtName: {name}, hasn't been found in db.");
                 }
                 else
                 {
-                    throw;
+                    _logger.LogInformation($"Returned product with  MaterialName: {name}");
                 }
+
+            }
+            catch (Exception ex)
+            {
+                throw new Exception();
             }
 
-            return NoContent();
+            return await result1.Include(o => o.ProductsMaterialOptions)
+                 .ToListAsync();
         }
 
-        // POST: api/Materials
+        //PUT: api/Products/5  //Update new and old name
 
-        [HttpPost]
-        public async Task<ActionResult<Material>> PostMaterial(Material material)
+        [HttpPut("{name}")]
+        public IActionResult UpdateMaterial(Material material , string name)
         {
-          if (_context.Materials == null)
-          {
-              return Problem("Entity set 'ProductsDbContext.Materials'  is null.");
-          }
-            _context.Materials.Add(material);
-            await _context.SaveChangesAsync();
+            if (string.IsNullOrEmpty(name))
+            {
+                _logger.LogError($"Name is empty ");
+            }
 
-            return CreatedAtAction("GetMaterial", new { id = material.MaterialId }, material);
+            try
+            {
+                var m = _context.Materials.FirstOrDefault(n => n.MaterialName == name && n.IsDeleted != true);
+                if (m == null)
+                {
+                    return StatusCode(404, "Materials not found");
+                }
+
+                m.MaterialName = material.MaterialName;
+                m.ProductsMaterialOptions = material.ProductsMaterialOptions;
+                m.MaterialId = material.MaterialId;
+                m.IsActive = material.IsActive;
+                m.CreatedBy = material.CreatedBy;
+                m.CreatedDate = material.CreatedDate;
+                m.CreatedIp = material.CreatedIp;
+                m.IsDeleted = material.IsDeleted;
+                m.UpdatedIp = material.UpdatedIp;
+                m.UpdatedDate = material.UpdatedDate;
+                m.UpdatedBy = material.UpdatedBy;
+                _context.Entry(m).State = EntityState.Modified;
+                _context.Update(m);
+                _context.SaveChanges();
+            }
+            catch
+            {
+                return StatusCode(500, "An error has occured");
+            }
+
+            return Ok();
         }
 
-
-        private bool MaterialExists(Guid id)
+        [HttpPost("CreateMaterial")]
+        public async Task<ActionResult<Material>> CreateMaterial([FromBody] Material material)
         {
-            return (_context.Materials?.Any(e => e.MaterialId == id)).GetValueOrDefault();
+            Material material1 = new Material();
+
+            if (material1 == null)
+            {
+                return StatusCode(404, "Materials not found");
+            }
+
+            material1.MaterialName = material.MaterialName;
+            material1.MaterialId = Guid.NewGuid();
+            material1.IsActive = material.IsActive;
+            material1.CreatedBy = Environment.UserName;
+            material1.CreatedDate = DateTime.Now;
+            material1.CreatedIp = material.CreatedIp;
+            material1.IsDeleted = material.IsDeleted;
+            material1.UpdatedIp = material.UpdatedIp;
+            material1.UpdatedDate = material.UpdatedDate;
+            material1.UpdatedBy = Environment.UserName;
+
+            try
+            {
+                _context.Materials.Add(material1);
+                _context.SaveChanges();
+            }
+
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal server error");
+
+            }
+
+            return Ok();
         }
+
+        [HttpDelete("name")]
+        public async Task<ActionResult<Product>> DeleteProduct(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                _logger.LogError($"Name is empty ");
+            }
+
+            try
+            {
+                var m = _context.Materials.FirstOrDefault(n => n.MaterialName == name && n.IsActive == true);
+                if (m == null)
+                {
+                    return StatusCode(404, "Materials not found");
+                }
+
+                m.IsActive = false;
+                _context.Entry(m).State = EntityState.Modified;
+                _context.Update(m);
+                _context.SaveChanges();
+            }
+            catch
+            {
+                return StatusCode(500, "An error has occured");
+            }
+
+            return Ok();
+        }
+
+
+        private bool MaterialExists(string name)
+        {
+            return (_context.Materials?.Any(e => e.MaterialName== name)).GetValueOrDefault();
+        }
+
+
     }
 }

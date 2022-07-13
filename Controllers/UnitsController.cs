@@ -14,91 +14,166 @@ namespace BenchmarkAPI.Controllers
     public class UnitsController : ControllerBase
     {
         private readonly ProductsDbContext _context;
+        private ILogger<ProductsController> _logger;
 
-        public UnitsController(ProductsDbContext context)
+
+        public UnitsController(ILogger<ProductsController> logger, ProductsDbContext context)
         {
+            _logger = logger;
             _context = context;
         }
 
-        // GET: api/Units
+
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Unit>>> GetUnits()
         {
-          if (_context.Units == null)
-          {
-              return NotFound();
-          }
-            return await _context.Units.ToListAsync();
+            var allunits = _context.Units.Where(p => p.IsDeleted == false && p.IsActive == true)
+                .Include(o => o.ProductsSizeOptions).ToListAsync();
+            return await allunits;
         }
 
-        // GET: api/Units/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Unit>> GetUnit(Guid id)
-        {
-          if (_context.Units == null)
-          {
-              return NotFound();
-          }
-            var unit = await _context.Units.FindAsync(id);
 
-            if (unit == null)
+ 
+        [HttpGet("{name}")]
+        public async Task<ActionResult<IEnumerable<Unit>>> GetUnitByName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
             {
-                return NotFound();
+                _logger.LogError($"Name is empty ");
             }
 
-            return unit;
-        }
 
-        // PUT: api/Units/5
-
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutUnit(Guid id, Unit unit)
-        {
-            if (id != unit.UnitId)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(unit).State = EntityState.Modified;
-
+            var result1 = (from p in _context.Units
+                           where p.UnitName == name && p.IsDeleted == false && p.IsActive != false
+                           select p);
             try
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!UnitExists(id))
+                var res = UnitExists(name);
+
+                if (res != true)
                 {
-                    return NotFound();
+                    _logger.LogError($"Product with  UnitName: {name}, hasn't been found in db.");
                 }
                 else
                 {
-                    throw;
+                    _logger.LogInformation($"Returned product with  UnitName: {name}");
                 }
+
+            }
+            catch (Exception ex)
+            {
+                throw new Exception();
             }
 
-            return NoContent();
+            return await result1.Include(o => o.ProductsSizeOptions)
+                 .ToListAsync();
         }
 
-        // POST: api/Units
 
-        [HttpPost]
-        public async Task<ActionResult<Unit>> PostUnit(Unit unit)
+        [HttpPut("{name}")]
+        public IActionResult UpdateUnit(Unit unit, string name)
         {
-          if (_context.Units == null)
-          {
-              return Problem("Entity set 'ProductsDbContext.Units'  is null.");
-          }
-            _context.Units.Add(unit);
-            await _context.SaveChangesAsync();
+            try
+            {
+                var p = _context.Units.FirstOrDefault(n => n.UnitName == name && n.IsDeleted != true);
+                if (p == null)
+                {
+                    return StatusCode(404, "Products not found");
+                }
 
-            return CreatedAtAction("GetUnit", new { id = unit.UnitId }, unit);
+                p.UnitName = unit.UnitName;
+                p.ProductsSizeOptions = unit.ProductsSizeOptions;
+                p.UnitId = unit.UnitId;
+                p.IsActive = unit.IsActive;
+                p.CreatedBy = unit.CreatedBy;
+                p.CreatedDate = unit.CreatedDate;
+                p.CreatedIp = unit.CreatedIp;
+                p.IsDeleted = unit.IsDeleted;
+                p.UpdatedIp = unit.UpdatedIp;
+                p.UpdatedDate = unit.UpdatedDate;
+                p.UpdatedBy = unit.UpdatedBy;
+                _context.Entry(p).State = EntityState.Modified;
+                _context.Update(p);
+                _context.SaveChanges();
+            }
+            catch
+            {
+                return StatusCode(500, "An error has occured");
+            }
+
+            return Ok();
         }
 
 
-        private bool UnitExists(Guid id)
+
+        // POST: api/Products
+        [HttpPost("CreateUnit")]
+        public async Task<ActionResult<Unit>> CreateUnit([FromBody] Unit unit)
         {
-            return (_context.Units?.Any(e => e.UnitId == id)).GetValueOrDefault();
+            Unit unit1 = new Unit();
+
+            if (unit == null)
+            {
+                return StatusCode(404, "Units not found");
+            }
+
+            unit1.UnitName = unit.UnitName;
+            unit1.UnitId = Guid.NewGuid();
+            unit1.IsActive = unit.IsActive;
+            unit1.CreatedBy = Environment.UserName;
+            unit1.CreatedDate = DateTime.Now;
+            unit1.CreatedIp = unit.CreatedIp;
+            unit1.IsDeleted = unit.IsDeleted;
+            unit1.UpdatedIp = unit.UpdatedIp;
+            unit1.UpdatedDate = unit.UpdatedDate;
+            unit1.UpdatedBy = Environment.UserName;
+
+            try
+            {
+                _context.Units.Add(unit1);
+                _context.SaveChanges();
+            }
+
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal server error");
+
+            }
+
+            return Ok();
         }
+
+        [HttpDelete("name")]
+        public async Task<ActionResult<Unit>> DeleteUnit(string name)
+        {
+            try
+            {
+                var p = _context.Units.FirstOrDefault(n => n.UnitName == name && n.IsActive == true);
+                if (p == null)
+                {
+                    return StatusCode(404, "Units not found");
+                }
+
+                p.IsActive = false;
+                _context.Entry(p).State = EntityState.Modified;
+                _context.Update(p);
+                _context.SaveChanges();
+            }
+            catch
+            {
+                return StatusCode(500, "An error has occured");
+            }
+
+            return Ok();
+        }
+
+
+        private bool UnitExists(string name)
+        {
+            return (_context.Units?.Any(e => e.UnitName == name)).GetValueOrDefault();
+        }
+
+
     }
 }

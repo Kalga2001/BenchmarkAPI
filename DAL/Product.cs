@@ -12,24 +12,24 @@ namespace BenchmarkAPI.DAL
         }
 
         public Guid ProductId { get; set; }
-        public string ProductName { get; set; } 
- 
-        public string CreateBy { get; set; } 
-
-        public DateTime CreateDate { get; set; }
-     
-        public string UpdateBy { get; set; } 
-
-        public DateTime UpdateDate { get; set; }
-
+        public string ProductName { get; set; }
+        [JsonIgnore]
+        public string CreatedBy { get; set; } = Environment.UserName;
+        [JsonIgnore]
+        public DateTime CreatedDate { get; set; }= DateTime.Now;
+        [JsonIgnore]
+        public string UpdatedBy { get; set; } = Environment.UserName;
+        [JsonIgnore]
+        public DateTime UpdatedDate { get; set; }= DateTime.Now;
+        [JsonIgnore]
         public string? CreatedIp { get; set; }
-
+        [JsonIgnore]
         public string? UpdatedIp { get; set; }
-    
+        [JsonIgnore]
         public bool? IsActive { get; set; }
-        
+        [JsonIgnore]
         public bool? IsDeleted { get; set; }
 
-        public virtual ICollection<ProductsOffer> ProductsOffers { get; set; }
+        public ICollection<ProductsOffer> ProductsOffers { get; set; }
     }
 }

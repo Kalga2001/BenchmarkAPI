@@ -9,28 +9,30 @@ namespace BenchmarkAPI.DAL
     public class ProductsOffer
     {
         public Guid OfferId { get; set; }
-     
+        [JsonIgnore]
         public Guid? MaterialOptionId { get; set; }
-
+        [JsonIgnore]
         public Guid? SizeOptionId { get; set; }
         public decimal? Price { get; set; }
-  
+        [JsonIgnore]
         public Guid? ProductId { get; set; }
-        public string CreatedBy { get; set; } 
-
-        public DateTime CreatedDate { get; set; }
-       
-        public string UpdatedBy { get; set; }
-     
-        public DateTime UpdatedDate { get; set; }
-
+        [JsonIgnore]
+        public string CreatedBy { get; set; } = Environment.UserName;
+        [JsonIgnore]
+        public DateTime CreatedDate { get; set; } = DateTime.Now;
+        [JsonIgnore]
+        public string UpdatedBy { get; set; } = Environment.UserName;
+        [JsonIgnore]
+        public DateTime UpdatedDate { get; set; } = DateTime.Now;
+        [JsonIgnore]
+        public string? CreatedIp { get; set; }
+        [JsonIgnore]
+        public string? UpdatedIp { get; set; }
+        [JsonIgnore]
         public bool? IsActive { get; set; }
-  
+        [JsonIgnore]
         public bool? IsDeleted { get; set; }
 
-        public string? CreatedIp { get; set; }
-
-        public string? UpdatedIp { get; set; }
 
         [JsonIgnore]
         public ProductsMaterialOption? MaterialOption { get; set; }

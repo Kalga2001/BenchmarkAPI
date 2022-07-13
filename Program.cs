@@ -1,6 +1,7 @@
 using BenchmarkAPI.DAL;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.HttpLogging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,11 +13,17 @@ builder.Services.AddEntityFrameworkSqlServer().AddDbContext<ProductsDbContext>(o
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddHttpLogging(httplogging =>
+{
+    httplogging.LoggingFields=HttpLoggingFields.All;
+}
+);
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
-
+app.UseHttpLogging();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -25,9 +32,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

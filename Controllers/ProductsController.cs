@@ -1,5 +1,4 @@
-﻿using BenchmarkAPI.Common.Dtos;
-using BenchmarkAPI.DAL;
+﻿using BenchmarkAPI.DAL;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -26,9 +25,8 @@ namespace BenchmarkAPI.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            var allproduct = _context.Products.Where(p => p.IsDeleted != false && p.IsActive != false)
-                .Include(o => o.ProductsOffers)
-                 .ToListAsync();
+            var allproduct = _context.Products.Where(p => p.IsDeleted == false && p.IsActive == true)
+                .Include(o => o.ProductsOffers).ToListAsync();
             return await allproduct;
         }
 
@@ -44,7 +42,7 @@ namespace BenchmarkAPI.Controllers
 
 
             var result1 = (from p in _context.Products
-                           where p.ProductName == name && p.IsDeleted != false && p.IsActive != false
+                           where p.ProductName == name && p.IsDeleted == false && p.IsActive != false
                            select p);
             try
             {
@@ -71,12 +69,17 @@ namespace BenchmarkAPI.Controllers
 
         //PUT: api/Products/5  //Update new and old name
 
-        [HttpPut("UpdateProduct")]
+        [HttpPut("{name}")]
         public IActionResult UpdateProduct(Product product, string name)
         {
+            if (string.IsNullOrEmpty(name))
+            {
+                _logger.LogError($"Name is empty ");
+            }
+
             try
             {
-                var p = _context.Products.FirstOrDefault(n => n.ProductName==name);
+                var p = _context.Products.FirstOrDefault(n => n.ProductName==name && n.IsDeleted != true);
                 if(p==null)
                 {
                     return StatusCode(404, "Products not found");
@@ -86,13 +89,13 @@ namespace BenchmarkAPI.Controllers
                 p.ProductsOffers = product.ProductsOffers;
                 p.ProductId = product.ProductId;
                 p.IsActive = product.IsActive;
-                p.CreateBy = product.CreateBy;
-                p.CreateDate = product.CreateDate;
+                p.CreatedBy = product.CreatedBy;
+                p.CreatedDate = product.CreatedDate;
                 p.CreatedIp = product.CreatedIp;
                 p.IsDeleted = product.IsDeleted;
                 p.UpdatedIp = product.UpdatedIp;
-                p.UpdateDate=product.UpdateDate;
-                p.UpdateBy=product.UpdateBy;
+                p.UpdatedDate=product.UpdatedDate;
+                p.UpdatedBy=product.UpdatedBy;
                 _context.Entry(p).State = EntityState.Modified;
                 _context.Update(p);
                 _context.SaveChanges();
@@ -102,9 +105,7 @@ namespace BenchmarkAPI.Controllers
                 return StatusCode(500, "An error has occured");
             }
 
-            var products = _context.Products.ToList();
-
-            return Ok(products);
+            return Ok();
         }
 
 
@@ -114,26 +115,26 @@ namespace BenchmarkAPI.Controllers
         public async Task<ActionResult<Product>> CreateProduct([FromBody] Product product)
         {
                 Product product1 = new Product();
+                
                 if (product1 == null)
                 {
                     return StatusCode(404, "Products not found");
                 }
 
                 product1.ProductName = product.ProductName;
-                product1.ProductsOffers = product.ProductsOffers;
-                product1.ProductId = new Guid();
+                product1.ProductId = Guid.NewGuid();
                 product1.IsActive = product.IsActive;
-                product1.CreateBy = Environment.UserName;
-                product1.CreateDate = DateTime.Now;
+                product1.CreatedBy = Environment.UserName;
+                product1.CreatedDate = DateTime.Now;
                 product1.CreatedIp = product.CreatedIp;
                 product1.IsDeleted = product.IsDeleted;
                 product1.UpdatedIp = product.UpdatedIp;
-                product1.UpdateDate = product.UpdateDate;
-                product1.UpdateBy = Environment.UserName;
+                product1.UpdatedDate = product.UpdatedDate;
+                product1.UpdatedBy = Environment.UserName;
            
             try
             {
-                _context.Products.Add(product);
+                _context.Products.Add(product1);
                 _context.SaveChanges();
             }
 
@@ -145,6 +146,35 @@ namespace BenchmarkAPI.Controllers
 
             return Ok();
          }
+
+        [HttpDelete("name")]
+        public async Task<ActionResult<Product>> DeleteProduct(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                _logger.LogError($"Name is empty ");
+            }
+
+            try
+            {
+                var p = _context.Products.FirstOrDefault(n => n.ProductName == name && n.IsActive==true);
+                if (p == null)
+                {
+                    return StatusCode(404, "Products not found");
+                }
+
+                p.IsActive = false;
+                _context.Entry(p).State = EntityState.Modified;
+                _context.Update(p);
+                _context.SaveChanges();
+            }
+            catch
+            {
+                return StatusCode(500, "An error has occured");
+            }
+
+            return Ok();
+        }
 
 
         private bool ProductExists(string name)
