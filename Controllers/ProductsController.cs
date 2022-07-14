@@ -88,14 +88,15 @@ namespace BenchmarkAPI.Controllers
                 p.ProductName = product.ProductName;
                 p.ProductsOffers = product.ProductsOffers;
                 p.ProductId = product.ProductId;
-                p.IsActive = product.IsActive;
-                p.CreatedBy = product.CreatedBy;
-                p.CreatedDate = product.CreatedDate;
+                p.IsActive = true;
+                p.CreatedBy = Environment.UserName;
+                p.CreatedDate = DateTime.Now;
                 p.CreatedIp = product.CreatedIp;
-                p.IsDeleted = product.IsDeleted;
+                p.IsDeleted = false;
                 p.UpdatedIp = product.UpdatedIp;
-                p.UpdatedDate=product.UpdatedDate;
-                p.UpdatedBy=product.UpdatedBy;
+                p.UpdatedDate = product.UpdatedDate;
+                p.UpdatedBy = Environment.UserName;
+
                 _context.Entry(p).State = EntityState.Modified;
                 _context.Update(p);
                 _context.SaveChanges();
@@ -115,7 +116,7 @@ namespace BenchmarkAPI.Controllers
         public async Task<ActionResult<Product>> CreateProduct([FromBody] Product product)
         {
                 Product product1 = new Product();
-                
+
                 if (product1 == null)
                 {
                     return StatusCode(404, "Products not found");
@@ -123,15 +124,17 @@ namespace BenchmarkAPI.Controllers
 
                 product1.ProductName = product.ProductName;
                 product1.ProductId = Guid.NewGuid();
-                product1.IsActive = product.IsActive;
+                product1.IsActive = true;
                 product1.CreatedBy = Environment.UserName;
                 product1.CreatedDate = DateTime.Now;
                 product1.CreatedIp = product.CreatedIp;
-                product1.IsDeleted = product.IsDeleted;
+                product1.IsDeleted = false;
                 product1.UpdatedIp = product.UpdatedIp;
                 product1.UpdatedDate = product.UpdatedDate;
                 product1.UpdatedBy = Environment.UserName;
-           
+
+
+
             try
             {
                 _context.Products.Add(product1);

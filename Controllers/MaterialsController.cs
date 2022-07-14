@@ -14,10 +14,10 @@ namespace BenchmarkAPI.Controllers
     public class MaterialsController : ControllerBase
     {
         private readonly ProductsDbContext _context;
-        private ILogger<ProductsController> _logger;
+        private ILogger<MaterialsController> _logger;
 
 
-        public MaterialsController(ILogger<ProductsController> logger, ProductsDbContext context)
+        public MaterialsController(ILogger<MaterialsController> logger, ProductsDbContext context)
         {
             _logger = logger;
             _context = context;
@@ -81,25 +81,25 @@ namespace BenchmarkAPI.Controllers
 
             try
             {
-                var m = _context.Materials.FirstOrDefault(n => n.MaterialName == name && n.IsDeleted != true);
-                if (m == null)
+                var p = _context.Materials.FirstOrDefault(n => n.MaterialName == name && n.IsDeleted != true);
+                if (p == null)
                 {
                     return StatusCode(404, "Materials not found");
                 }
 
-                m.MaterialName = material.MaterialName;
-                m.ProductsMaterialOptions = material.ProductsMaterialOptions;
-                m.MaterialId = material.MaterialId;
-                m.IsActive = material.IsActive;
-                m.CreatedBy = material.CreatedBy;
-                m.CreatedDate = material.CreatedDate;
-                m.CreatedIp = material.CreatedIp;
-                m.IsDeleted = material.IsDeleted;
-                m.UpdatedIp = material.UpdatedIp;
-                m.UpdatedDate = material.UpdatedDate;
-                m.UpdatedBy = material.UpdatedBy;
-                _context.Entry(m).State = EntityState.Modified;
-                _context.Update(m);
+                p.MaterialName = material.MaterialName;
+                p.ProductsMaterialOptions = material.ProductsMaterialOptions;
+                p.MaterialId = material.MaterialId;
+                p.IsActive = true;
+                p.CreatedBy = Environment.UserName;
+                p.CreatedDate = DateTime.Now;
+                p.CreatedIp = material.CreatedIp;
+                p.IsDeleted = false;
+                p.UpdatedIp = material.UpdatedIp;
+                p.UpdatedDate = material.UpdatedDate;
+                p.UpdatedBy = Environment.UserName;
+                _context.Entry(p).State = EntityState.Modified;
+                _context.Update(p);
                 _context.SaveChanges();
             }
             catch
@@ -122,11 +122,11 @@ namespace BenchmarkAPI.Controllers
 
             material1.MaterialName = material.MaterialName;
             material1.MaterialId = Guid.NewGuid();
-            material1.IsActive = material.IsActive;
+            material1.IsActive = true;
             material1.CreatedBy = Environment.UserName;
             material1.CreatedDate = DateTime.Now;
             material1.CreatedIp = material.CreatedIp;
-            material1.IsDeleted = material.IsDeleted;
+            material1.IsDeleted = false;
             material1.UpdatedIp = material.UpdatedIp;
             material1.UpdatedDate = material.UpdatedDate;
             material1.UpdatedBy = Environment.UserName;

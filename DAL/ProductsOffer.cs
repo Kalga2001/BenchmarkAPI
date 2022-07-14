@@ -33,14 +33,11 @@ namespace BenchmarkAPI.DAL
         [JsonIgnore]
         public bool? IsDeleted { get; set; }
 
-
-        [JsonIgnore]
         public ProductsMaterialOption? MaterialOption { get; set; }
 
-        [JsonIgnore]
         public Product? Product { get; set; }
 
-        [JsonIgnore]
+
         public  ProductsSizeOption? SizeOption { get; set; }
     }
 }

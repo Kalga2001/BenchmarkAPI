@@ -29,7 +29,7 @@ namespace BenchmarkAPI.DAL
         public bool? IsActive { get; set; }
         [JsonIgnore]
         public bool? IsDeleted { get; set; }
-
+        [JsonIgnore]
         public ICollection<ProductsOffer> ProductsOffers { get; set; }
     }
 }

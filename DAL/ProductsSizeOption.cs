@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace BenchmarkAPI.DAL
 {
@@ -16,6 +17,7 @@ namespace BenchmarkAPI.DAL
         public Guid? UnitId { get; set; }
 
         public  Unit? Unit { get; set; }
+        [JsonIgnore]
         public  ICollection<ProductsOffer> ProductsOffers { get; set; }
     }
 }

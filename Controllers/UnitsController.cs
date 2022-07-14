@@ -14,10 +14,10 @@ namespace BenchmarkAPI.Controllers
     public class UnitsController : ControllerBase
     {
         private readonly ProductsDbContext _context;
-        private ILogger<ProductsController> _logger;
+        private ILogger<UnitsController> _logger;
 
 
-        public UnitsController(ILogger<ProductsController> logger, ProductsDbContext context)
+        public UnitsController(ILogger<UnitsController> logger, ProductsDbContext context)
         {
             _logger = logger;
             _context = context;
@@ -85,14 +85,14 @@ namespace BenchmarkAPI.Controllers
                 p.UnitName = unit.UnitName;
                 p.ProductsSizeOptions = unit.ProductsSizeOptions;
                 p.UnitId = unit.UnitId;
-                p.IsActive = unit.IsActive;
-                p.CreatedBy = unit.CreatedBy;
-                p.CreatedDate = unit.CreatedDate;
+                p.IsActive = true;
+                p.CreatedBy = Environment.UserName;
+                p.CreatedDate = DateTime.Now;
                 p.CreatedIp = unit.CreatedIp;
-                p.IsDeleted = unit.IsDeleted;
+                p.IsDeleted = false;
                 p.UpdatedIp = unit.UpdatedIp;
                 p.UpdatedDate = unit.UpdatedDate;
-                p.UpdatedBy = unit.UpdatedBy;
+                p.UpdatedBy = Environment.UserName;
                 _context.Entry(p).State = EntityState.Modified;
                 _context.Update(p);
                 _context.SaveChanges();
@@ -120,11 +120,11 @@ namespace BenchmarkAPI.Controllers
 
             unit1.UnitName = unit.UnitName;
             unit1.UnitId = Guid.NewGuid();
-            unit1.IsActive = unit.IsActive;
+            unit1.IsActive = true;
             unit1.CreatedBy = Environment.UserName;
             unit1.CreatedDate = DateTime.Now;
             unit1.CreatedIp = unit.CreatedIp;
-            unit1.IsDeleted = unit.IsDeleted;
+            unit1.IsDeleted = false;
             unit1.UpdatedIp = unit.UpdatedIp;
             unit1.UpdatedDate = unit.UpdatedDate;
             unit1.UpdatedBy = Environment.UserName;

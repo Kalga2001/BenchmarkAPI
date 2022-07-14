@@ -18,10 +18,10 @@ namespace BenchmarkAPI.DAL
 
         public  DbSet<Material> Materials { get; set; } 
         public  DbSet<Product> Products { get; set; }
-        public  DbSet<ProductsMaterialOption> ProductsMaterialOptions { get; set; } = null!;
-        public  DbSet<ProductsOffer> ProductsOffers { get; set; } = null!;
-        public  DbSet<ProductsSizeOption> ProductsSizeOptions { get; set; } = null!;
-        public  DbSet<Unit> Units { get; set; } = null!;
+        public  DbSet<ProductsMaterialOption> ProductsMaterialOptions { get; set; }
+        public  DbSet<ProductsOffer> ProductsOffers { get; set; }
+        public  DbSet<ProductsSizeOption> ProductsSizeOptions { get; set; } 
+        public  DbSet<Unit> Units { get; set; } 
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

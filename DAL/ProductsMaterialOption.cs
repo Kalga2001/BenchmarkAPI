@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace BenchmarkAPI.DAL
 {
@@ -15,6 +16,7 @@ namespace BenchmarkAPI.DAL
         public Guid? MaterialId { get; set; }
 
         public Material? Material { get; set; }
+        [JsonIgnore]
         public ICollection<ProductsOffer> ProductsOffers { get; set; }
     }
 }
