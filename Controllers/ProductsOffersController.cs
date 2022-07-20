@@ -1,215 +1,315 @@
-﻿using BenchmarkAPI.DAL;
+﻿using BenchmarkAPI.Common.ResultDtos.ProductsOffersDto;
+using BenchmarkAPI.DAL;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Linq;
+using System.Net;
 
 namespace BenchmarkAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ProductsOffersController:ControllerBase
+    public class ProductsOffersController : ControllerBase
     {
-        private readonly ProductsDbContext _context;
+
         private ILogger<ProductsOffersController> _logger;
 
 
-        public ProductsOffersController(ILogger<ProductsOffersController> logger, ProductsDbContext context)
+        public ProductsOffersController(ILogger<ProductsOffersController> logger)
         {
             _logger = logger;
-            _context = context;
+
+        }
+
+
+        [HttpGet("GetAll")]
+        public async Task<GetOffersResultDto> GetProductsOffers()
+        {
+            var result = new GetOffersResultDto();
+            try
+            {
+                using (var _context = new ProductsDbContext())
+                {
+                    List<ProductsOffer> allOffers = await _context.ProductsOffers.Where(p => p.IsDeleted == false && p.IsActive == true).ToListAsync();
+
+                    if (allOffers.Any())
+                    {
+                        result.ProductsOffers = allOffers;
+                        result.Status = "Completed";
+                        result.Code = 200;
+                    }
+                    else
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                _logger.LogError("[{1}]:Error in Get Products Offers {2}.", DateTime.Now, ex.InnerException);
+            }
+            return result;
         }
 
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProductsOffer>>> GetProductsOffers()
+        public async Task<GetOffersResultDto> GetProductsOffersByProductName(string name)
         {
-            var result = _context.ProductsOffers
-                .Include(e => e.Product)
-                .Include(e => e.MaterialOption)
-                .Include(e => e.SizeOption)
-                .Where(e => e.IsActive == true);
-
-
-            return await result.ToListAsync();
-
-        }
-
-        [HttpGet("{name}")]
-        public async Task<ActionResult<IEnumerable<ProductsOffer>>> GetOfferByProductName(string name)
-        {
-
-            Product product = new Product();
-            if (product.ProductName!=name)
-            {
-                _logger.LogInformation($"Not found product offer with name {name}");
-            }
-
-
-            var result = (from p in _context.Products join o in _context.ProductsOffers
-                           on p.ProductId equals o.ProductId 
-                           where p.ProductName == name && o.IsDeleted == false && o.IsActive != false
-                           select o).ToListAsync();
-
+            var result = new GetOffersResultDto();
 
             try
             {
-                var res = OffersExists(name);
+                using (var _context = new ProductsDbContext())
+                {
 
-                if (res != true)
-                {
-                    _logger.LogError($"Offer at ProductName: {name}, hasn't been found in db.");
-                }
-                else
-                {
-                    _logger.LogInformation($"Returned offer at ProductName: {name}");
+                    var product = _context.Products.First(p => p.ProductName == name);
+
+                    List<ProductsOffer> offers = await _context.ProductsOffers
+                    .Where(p => p.IsDeleted == false && p.IsActive == true && p.ProductId == product.ProductId)
+                    .ToListAsync();
+
+                    if (offers != null)
+                    {
+                        result.ProductsOffers = offers;
+                        result.Status = "Completed";
+                        result.Code = 200;
+                    }
+
+                    else
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                    }
                 }
 
             }
             catch (Exception ex)
             {
-                throw new Exception();
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                _logger.LogError("[{1}]:Error in Get Products Offer By Price {2}.", DateTime.Now, ex.InnerException);
             }
+            return result;
 
-            return await result;
         }
 
 
-        [HttpPut("{id}")]
-        public IActionResult UpdateProductOffers([FromBody] ProductsOffer offer, string name)
-        {
-            if(string.IsNullOrEmpty(name))
-            {
-                _logger.LogError($"Entry param is empty ");
-            }
 
-            ProductsOffer offer1 = new ProductsOffer();
+        [HttpPut]
+        public async Task<UpdateOffersResultDto> UpdateProductsOffers(string name, decimal newPrice)
+        {
+            var result = new UpdateOffersResultDto();
+           
+            if (!ModelState.IsValid)
+            {
+                result.Status = "No Updated";
+                result.Code = 400;
+                result.IsUpdated = false;
+            }
 
             try
             {
-                if (offer == null)
+                using (var _context = new ProductsDbContext())
                 {
-                    return StatusCode(404, "Offers not found");
+                    var product = _context.Products.First(p => p.ProductName == name);
+                    if (product == null)
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                        result.IsUpdated = false;
+                    }
+
+
+                    var offer = _context.ProductsOffers.First(p => p.ProductId == product.ProductId);
+
+                    if (offer != null)
+                    {
+
+                        offer.Price = newPrice;
+                        offer.UpdatedIp = Dns.GetHostName();
+                        offer.UpdatedDate = DateTime.Now;
+                        offer.UpdatedBy = Environment.UserName;
+
+
+                        _context.Entry(offer).State = EntityState.Modified;
+                        _context.Update(offer);
+                        _context.SaveChanges();
+
+                        result.Status = "Updated";
+                        result.Code = 204;
+                        result.IsUpdated = true;
+
+                    }
+
+                    else
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                        result.IsUpdated = false;
+                    }
                 }
 
-                offer1.Price = offer.Price;
-                offer1.OfferId = offer.OfferId;
-                offer1.IsActive = true;
-                offer1.CreatedBy = Environment.UserName;
-                offer1.CreatedDate = DateTime.Now;
-                offer1.CreatedIp = offer.CreatedIp;
-                offer1.IsDeleted = false;
-                offer1.UpdatedIp = offer.UpdatedIp;
-                offer1.UpdatedDate = offer.UpdatedDate;
-                offer1.UpdatedBy = Environment.UserName;
-                offer1.Product = new Product
-                {
-                    ProductName = name,
-                    IsDeleted = offer.IsDeleted,
-                    CreatedBy = Environment.UserName,
-                    IsActive = offer.IsActive,
-                    UpdatedBy = Environment.UserName
-                };
-
-                _context.Entry(offer1).State = EntityState.Modified;
-                _context.Update(offer1);
-              
-          
-
-                _context.SaveChanges();
             }
-            catch
+            catch (Exception ex)
             {
-                return StatusCode(500, "An error has occured");
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                result.IsUpdated = false;
+                _logger.LogError("[{1}]:Error in Update Price {2}.", DateTime.Now, ex.InnerException);
             }
+            return result;
 
-            return Ok();
-        }
-
-        [HttpPost("PostOffer")]
-        public async Task<ActionResult<ProductsOffer>> CreateOfferForProduct([FromBody] ProductsOffer offer, string name)
-        {
-            ProductsOffer offer1 = new ProductsOffer();
-            Product product = new Product();
-
-             if(product.ProductName!=name)
-            {
-                _logger.LogInformation($"Not found product: {product.ProductName}");
-            }
-
-            if (offer1 == null)
-            {
-                return StatusCode(404, "Offers not found");
-            }
-
-            offer1.Price = offer.Price;
-            offer1.OfferId = offer.OfferId;
-            offer1.IsActive = true;
-            offer1.CreatedBy = Environment.UserName;
-            offer1.CreatedDate = DateTime.Now;
-            offer1.CreatedIp = offer.CreatedIp;
-            offer1.IsDeleted = false;
-            offer1.UpdatedIp = offer.UpdatedIp;
-            offer1.UpdatedDate = offer.UpdatedDate;
-            offer1.UpdatedBy = Environment.UserName;
-            offer1.Product = new Product
-            {
-                ProductName = name,
-                IsDeleted = offer.IsDeleted,
-                CreatedBy = Environment.UserName,
-                IsActive=offer.IsActive,
-                UpdatedBy = Environment.UserName
-            };
-
-            try
-            {
-                _context.ProductsOffers.Add(offer1);
-                _context.SaveChanges();
-            }
-
-            catch (Exception)
-            {
-                return StatusCode(500, "Internal server error");
-
-            }
-
-
-            return Ok();
         }
 
 
-        [HttpDelete("id")]
-        public async Task<ActionResult<ProductsOffer>> DeleteOffer(Guid id)
+
+        [HttpPost]
+        public async Task<CreateOffersResultDto> CreateProductsOfferByProductName(string name, decimal newPrice)
         {
-            if (id==null)
+            var result = new CreateOffersResultDto();
+            if (!ModelState.IsValid)
             {
-                _logger.LogError($"Field is empty ");
+                result.Status = "No Created";
+                result.Code = 400;
+                result.IsCreated= false;
             }
 
             try
             {
-                var p = _context.ProductsOffers.FirstOrDefault(n => n.OfferId== id && n.IsActive == true);
-                if (p == null)
+
+                using (var _context = new ProductsDbContext())
                 {
-                    return StatusCode(404, "Products not found");
+                  
+                        var product = _context.Products.First(p => p.ProductName == name);
+
+                        if (product == null)
+                        {
+                            result.Status = "Not Found";
+                            result.Code = 404;
+                            result.IsCreated = false;
+                        }
+
+                        else
+                        {
+                            result.Status = "No Created";
+                            result.Code = 400;
+                            result.IsCreated = false;
+                        }
+
+
+                        var offer = _context.ProductsOffers.First(p => p.ProductId == product.ProductId);
+
+
+                        if (offer == null)
+                        {
+                            offer.Price = newPrice;
+                            offer.OfferId = Guid.NewGuid();
+                            offer.IsActive = true;
+                            offer.CreatedBy = Environment.UserName;
+                            offer.CreatedDate = DateTime.Now;
+                            offer.CreatedIp = Dns.GetHostName();
+                            offer.IsDeleted = false;
+
+                            result.Code = 201;
+                            result.Status = "Created";
+                            result.IsCreated = true;
+                            _context.ProductsOffers.Add(offer);
+                            _context.SaveChanges();
+                        }
+
+                        else
+                        {
+                            result.Status = "No Created";
+                            result.Code = 400;
+                            result.IsCreated = false;
+                        }
+                                 
                 }
-
-                p.IsActive = false;
-                _context.Entry(p).State = EntityState.Modified;
-                _context.Update(p);
-                _context.SaveChanges();
             }
-            catch
+
+            catch (Exception ex)
             {
-                return StatusCode(500, "An error has occured");
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                result.IsCreated = false;
+                _logger.LogError("[{1}]:Error in Create Product Offer {2}.", DateTime.Now, ex.InnerException);
+
             }
 
-            return Ok();
+            return result;
         }
 
 
-        private bool OffersExists(string name)
+
+        [HttpDelete]
+        public async Task<DeleteOffersResultDto> DeleteProductOffers(string name)
         {
-            return (_context.Products?.Any(e => e.ProductName == name)).GetValueOrDefault();
+
+            var result = new DeleteOffersResultDto();
+
+            if (!ModelState.IsValid)
+            {
+                result.Status = "No Deleted";
+                result.Code = 400;
+                result.IsDeleted = false;
+            }
+
+            try
+            {
+                using (var _context = new ProductsDbContext())
+                {
+
+
+                    var product = _context.Products.First(p => p.ProductName == name);
+
+
+                    if (product == null)
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                        result.IsDeleted = false;
+                    }
+
+
+                    var offer = _context.ProductsOffers.First(p => p.ProductId == product.ProductId);
+
+                    if (offer == null)
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                        result.IsDeleted = false;
+                    }
+
+
+                    else
+                    {
+                        offer.IsActive = false;
+                        offer.IsDeleted = true;
+                        result.Status = "Deleted";
+                        result.Code = 200;
+                        result.IsDeleted = true;
+                        _context.Entry(offer).State = EntityState.Modified;
+                        _context.ProductsOffers.Update(offer);
+                        _context.SaveChanges();
+                    }
+
+                }
+            }
+
+            catch (Exception ex)
+            {
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                result.IsDeleted = false;
+                _logger.LogError("[{1}]:Error in Delete Product Offer {2}.", DateTime.Now, ex.InnerException);
+
+            }
+
+            return result;
         }
     }
 }

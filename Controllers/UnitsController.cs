@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BenchmarkAPI.DAL;
+using System.Net;
+using BenchmarkAPI.Common.ResultDtos.UnitsDto;
 
 namespace BenchmarkAPI.Controllers
 {
@@ -13,167 +15,268 @@ namespace BenchmarkAPI.Controllers
     [ApiController]
     public class UnitsController : ControllerBase
     {
-        private readonly ProductsDbContext _context;
+
         private ILogger<UnitsController> _logger;
 
 
-        public UnitsController(ILogger<UnitsController> logger, ProductsDbContext context)
+        public UnitsController(ILogger<UnitsController> logger)
         {
             _logger = logger;
-            _context = context;
+  
         }
 
+
+        [HttpGet("GetAll")]
+        public async Task<GetUnitsResultDto> GetUnits()
+        {
+            var result = new GetUnitsResultDto();
+
+            try
+            {
+                using (var _context = new ProductsDbContext())
+                {
+                    List<Unit> allUnits = await _context.Units.Where(p => p.IsDeleted == false && p.IsActive == true).ToListAsync();
+
+                    if (allUnits.Any())
+                    {
+                        result.Units = allUnits;
+                        result.Status = "Completed";
+                        result.Code = 200;
+                    }
+                    else
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                _logger.LogError("[{1}]:Error in Get Units{2}.", DateTime.Now, ex.InnerException);
+            }
+            return result;
+        }
 
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Unit>>> GetUnits()
+        public async Task<GetUnitsResultDto> GetUnitByName(string name)
         {
-            var allunits = _context.Units.Where(p => p.IsDeleted == false && p.IsActive == true)
-                .Include(o => o.ProductsSizeOptions).ToListAsync();
-            return await allunits;
-        }
+            var result = new GetUnitsResultDto();
 
-
- 
-        [HttpGet("{name}")]
-        public async Task<ActionResult<IEnumerable<Unit>>> GetUnitByName(string name)
-        {
-            if (string.IsNullOrEmpty(name))
+            if (!ModelState.IsValid)
             {
-                _logger.LogError($"Name is empty ");
+                result.Status = "No Completed";
+                result.Code = 400;
             }
 
-
-            var result1 = (from p in _context.Units
-                           where p.UnitName == name && p.IsDeleted == false && p.IsActive != false
-                           select p);
             try
             {
-                var res = UnitExists(name);
+                using (var _context = new ProductsDbContext())
+                {
 
-                if (res != true)
-                {
-                    _logger.LogError($"Product with  UnitName: {name}, hasn't been found in db.");
-                }
-                else
-                {
-                    _logger.LogInformation($"Returned product with  UnitName: {name}");
+                    var unit = (from p in _context.Units
+                                where p.UnitName == name && p.IsDeleted == false && p.IsActive != false
+                                select p);
+
+                    if (unit.Count() > 0)
+                    {
+                        result.Units = unit.ToList();
+                        result.Status = "Completed";
+                        result.Code = 200;
+                    }
+
+                    else
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                    }
                 }
 
             }
             catch (Exception ex)
             {
-                throw new Exception();
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                _logger.LogError("[{1}]:Error in Get Units By Name {2}.", DateTime.Now, ex.InnerException);
             }
+            return result;
 
-            return await result1.Include(o => o.ProductsSizeOptions)
-                 .ToListAsync();
         }
 
 
-        [HttpPut("{name}")]
-        public IActionResult UpdateUnit(Unit unit, string name)
+
+        [HttpPut]
+        public async Task<UpdateUnitResultDto> UpdateUnitByName (string oldName, string newName)
         {
+            var result = new UpdateUnitResultDto();
+            
+            if (!ModelState.IsValid)
+            {
+                result.Status = "No Updated";
+                result.Code = 400;
+                result.IsUpdated = false;
+            }
+
+
             try
             {
-                var p = _context.Units.FirstOrDefault(n => n.UnitName == name && n.IsDeleted != true);
-                if (p == null)
+                using (var _context = new ProductsDbContext())
                 {
-                    return StatusCode(404, "Products not found");
+
+                    var unit = _context.Units.First(n => n.UnitName == oldName && n.IsDeleted != true);
+
+
+                    if (unit != null)
+                    {
+
+                        unit.UnitName = newName;
+                        unit.UpdatedIp = Dns.GetHostName();
+                        unit.UpdatedDate = DateTime.Now;
+                        unit.UpdatedBy = Environment.UserName;
+
+                        _context.Entry(unit).State = EntityState.Modified;
+                        _context.Update(unit);
+                        _context.SaveChanges();
+
+                        result.Status = "Updated";
+                        result.Code = 204;
+                        result.IsUpdated = true;
+                    }
+
+                    else
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                        result.IsUpdated = false;
+                    }
+
+
+
                 }
 
-                p.UnitName = unit.UnitName;
-                p.ProductsSizeOptions = unit.ProductsSizeOptions;
-                p.UnitId = unit.UnitId;
-                p.IsActive = true;
-                p.CreatedBy = Environment.UserName;
-                p.CreatedDate = DateTime.Now;
-                p.CreatedIp = unit.CreatedIp;
-                p.IsDeleted = false;
-                p.UpdatedIp = unit.UpdatedIp;
-                p.UpdatedDate = unit.UpdatedDate;
-                p.UpdatedBy = Environment.UserName;
-                _context.Entry(p).State = EntityState.Modified;
-                _context.Update(p);
-                _context.SaveChanges();
             }
-            catch
+            catch (Exception ex)
             {
-                return StatusCode(500, "An error has occured");
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                result.IsUpdated = false;
+                _logger.LogError("[{1}]:Error in Update Unit {2}.", DateTime.Now, ex.InnerException);
             }
+            return result;
 
-            return Ok();
         }
 
 
 
-        // POST: api/Products
-        [HttpPost("CreateUnit")]
-        public async Task<ActionResult<Unit>> CreateUnit([FromBody] Unit unit)
+        [HttpPost]
+        public async Task<CreateUnitResultDto> CreateUnitByName(string name)
         {
-            Unit unit1 = new Unit();
+            var result = new CreateUnitResultDto();
 
-            if (unit == null)
+            if (!ModelState.IsValid)
             {
-                return StatusCode(404, "Units not found");
+                result.Status = "No Created";
+                result.Code = 400;
+                result.IsCreated = false;
             }
-
-            unit1.UnitName = unit.UnitName;
-            unit1.UnitId = Guid.NewGuid();
-            unit1.IsActive = true;
-            unit1.CreatedBy = Environment.UserName;
-            unit1.CreatedDate = DateTime.Now;
-            unit1.CreatedIp = unit.CreatedIp;
-            unit1.IsDeleted = false;
-            unit1.UpdatedIp = unit.UpdatedIp;
-            unit1.UpdatedDate = unit.UpdatedDate;
-            unit1.UpdatedBy = Environment.UserName;
 
             try
             {
-                _context.Units.Add(unit1);
-                _context.SaveChanges();
-            }
 
-            catch (Exception)
-            {
-                return StatusCode(500, "Internal server error");
-
-            }
-
-            return Ok();
-        }
-
-        [HttpDelete("name")]
-        public async Task<ActionResult<Unit>> DeleteUnit(string name)
-        {
-            try
-            {
-                var p = _context.Units.FirstOrDefault(n => n.UnitName == name && n.IsActive == true);
-                if (p == null)
+                using (var _context = new ProductsDbContext())
                 {
-                    return StatusCode(404, "Units not found");
+                    Unit unit =new Unit();
+
+                  
+                        unit.UnitName = name;
+                        unit.UnitId = Guid.NewGuid();
+                        unit.IsActive = true;
+                        unit.CreatedBy = Environment.UserName;
+                        unit.CreatedDate = DateTime.Now;
+                        unit.CreatedIp = Dns.GetHostName();
+                        unit.IsDeleted = false;
+
+                        result.Status = "Created";
+                        result.Code = 201;
+                        result.IsCreated = true;
+                        _context.Units.Add(unit);
+                        _context.SaveChanges();
+                    
+                   
                 }
-
-                p.IsActive = false;
-                _context.Entry(p).State = EntityState.Modified;
-                _context.Update(p);
-                _context.SaveChanges();
             }
-            catch
+
+            catch (Exception ex)
             {
-                return StatusCode(500, "An error has occured");
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                result.IsCreated = false;
+                _logger.LogError("[{1}]:Error in Create Unit {2}.", DateTime.Now, ex.InnerException);
+
             }
 
-            return Ok();
+            return result;
         }
 
 
-        private bool UnitExists(string name)
+
+        [HttpDelete]
+        public async Task<DeleteUnitResultDto> DeleteUnitByName(string name)
         {
-            return (_context.Units?.Any(e => e.UnitName == name)).GetValueOrDefault();
-        }
 
+            var result = new DeleteUnitResultDto();
+
+            if (!ModelState.IsValid)
+            {
+                result.Status = "No Deleted";
+                result.Code = 400;
+                result.IsDeleted = false;
+            }
+
+            try
+            {
+                using (var _context = new ProductsDbContext())
+                {
+
+                    var unit = _context.Units.First(n => n.UnitName == name && n.IsActive == true);
+
+                    if (unit != null)
+                    {
+                        unit.IsActive = false;
+                        unit.IsDeleted = true;
+
+                        result.Status = "Deleted";
+                        result.Code = 200;
+                        result.IsDeleted = true;
+                        _context.Entry(unit).State = EntityState.Modified;
+                        _context.Units.Update(unit);
+                        _context.SaveChanges();
+                    }
+
+                    else
+                    {
+                        result.Status = "No Deleted";
+                        result.Code = 400;
+                        result.IsDeleted = false;
+                    }
+
+                }
+            }
+
+
+            catch (Exception ex)
+            {
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                result.IsDeleted = false;
+                _logger.LogError("[{1}]:Error in Delete Product {2}.", DateTime.Now, ex.InnerException);
+
+            }
+
+            return result;
+        }
 
     }
 }

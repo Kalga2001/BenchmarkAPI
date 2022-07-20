@@ -1,7 +1,9 @@
-﻿using BenchmarkAPI.DAL;
+﻿using BenchmarkAPI.Common.ResultDtos.ProductsDto;
+using BenchmarkAPI.DAL;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Linq;
 using System.Net;
 
 namespace BenchmarkAPI.Controllers
@@ -10,182 +12,270 @@ namespace BenchmarkAPI.Controllers
     [ApiController]
     public class ProductsController : ControllerBase
     {
-        private readonly ProductsDbContext _context;
         private ILogger<ProductsController> _logger;
 
 
-        public ProductsController(ILogger<ProductsController> logger, ProductsDbContext context)
+        public ProductsController(ILogger<ProductsController> logger)
         {
             _logger = logger;
-            _context = context;
-        }
-
-        // GET: api/Products
-
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
-        {
-            var allproduct = _context.Products.Where(p => p.IsDeleted == false && p.IsActive == true)
-                .Include(o => o.ProductsOffers).ToListAsync();
-            return await allproduct;
         }
 
 
-        // GET: api/Products/5     
-        [HttpGet("{name}")]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProductByName(string name)
+
+        [HttpGet("GetAll")]
+        public async Task<GetProductResultDto> GetProducts()
         {
-            if (string.IsNullOrEmpty(name))
-            {
-                _logger.LogError($"Name is empty ");
-            }
-
-
-            var result1 = (from p in _context.Products
-                           where p.ProductName == name && p.IsDeleted == false && p.IsActive != false
-                           select p);
+            var result = new GetProductResultDto();
             try
             {
-                var res = ProductExists(name);
+                using (var _context = new ProductsDbContext())
+                {
+                    List<Product> allProducts = await _context.Products.Where(p => p.IsDeleted == false && p.IsActive == true).ToListAsync();
 
-                if (res != true)
-                {
-                    _logger.LogError($"Product with ProductName: {name}, hasn't been found in db.");
+                    if (allProducts.Any())
+                    {
+                        result.Products = allProducts;
+                        result.Status = "Completed";
+                        result.Code = 200;
+                    }
+                    else
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                    }
                 }
-                else
+            }
+            catch (Exception ex)
+            {
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                _logger.LogError("[{1}]:Error in Get Products {2}.", DateTime.Now, ex.InnerException);
+            }
+            return result;
+        }
+
+
+        [HttpGet]
+        public async Task<GetProductResultDto> GetProductByName(string name)
+        {
+            var result = new GetProductResultDto();
+
+            if (!ModelState.IsValid)
+            {
+                result.Status = "No Completed";
+                result.Code = 400;
+            }
+
+            try
+            {
+                using (var _context = new ProductsDbContext())
                 {
-                    _logger.LogInformation($"Returned product with ProductName: {name}");
+
+                    var product = (from p in _context.Products
+                                   where p.ProductName == name && p.IsDeleted == false && p.IsActive != false
+                                   select p);
+
+                    if (product.Count() > 0)
+                    {
+                        result.Products = product.ToList();
+                        result.Status = "Completed";
+                        result.Code = 200;
+                    }
+
+
+                    else
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                    }
+
+
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                _logger.LogError("[{1}]:Error in Get Products By Name {2}.", DateTime.Now, ex.InnerException);
+            }
+            return result;
+
+        }
+
+
+
+        [HttpPut]
+        public async Task<UpdateProductResultDto> UpdateProductByName(string oldName, string newName)
+        {
+            var result = new UpdateProductResultDto();
+
+            if (!ModelState.IsValid)
+            {
+                result.Status = "No Updated";
+                result.Code = 400;
+                result.IsUpdated = false;
+            }
+
+            try
+            {
+                using (var _context = new ProductsDbContext())
+                {
+
+                    var product = _context.Products.First(n => n.ProductName == oldName && n.IsDeleted != true);
+
+
+                    if (product != null)
+                    {
+
+                        product.ProductName = newName;
+                        product.UpdatedIp = Dns.GetHostName();
+                        product.UpdatedDate = DateTime.Now;
+                        product.UpdatedBy = Environment.UserName;
+
+                        _context.Entry(product).State = EntityState.Modified;
+                        _context.Update(product);
+
+
+                        result.Status = "Updated";
+                        result.Code = 204;
+                        result.IsUpdated = true;
+
+                        _context.SaveChanges();
+
+                    }
+
+                    else
+                    {
+                        result.Status = "Not Found";
+                        result.Code = 404;
+                        result.IsUpdated = false;
+                    }
                 }
 
             }
             catch (Exception ex)
             {
-                throw new Exception();
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                result.IsUpdated = false;
+                _logger.LogError("[{1}]:Error in Update Product {2}.", DateTime.Now, ex.InnerException);
             }
+            return result;
 
-            return await result1.Include(o => o.ProductsOffers)
-                 .ToListAsync();
-        }
-
-        //PUT: api/Products/5  //Update new and old name
-
-        [HttpPut("{name}")]
-        public IActionResult UpdateProduct(Product product, string name)
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                _logger.LogError($"Name is empty ");
-            }
-
-            try
-            {
-                var p = _context.Products.FirstOrDefault(n => n.ProductName==name && n.IsDeleted != true);
-                if(p==null)
-                {
-                    return StatusCode(404, "Products not found");
-                }
-
-                p.ProductName = product.ProductName;
-                p.ProductsOffers = product.ProductsOffers;
-                p.ProductId = product.ProductId;
-                p.IsActive = true;
-                p.CreatedBy = Environment.UserName;
-                p.CreatedDate = DateTime.Now;
-                p.CreatedIp = product.CreatedIp;
-                p.IsDeleted = false;
-                p.UpdatedIp = product.UpdatedIp;
-                p.UpdatedDate = product.UpdatedDate;
-                p.UpdatedBy = Environment.UserName;
-
-                _context.Entry(p).State = EntityState.Modified;
-                _context.Update(p);
-                _context.SaveChanges();
-            }
-            catch
-            {
-                return StatusCode(500, "An error has occured");
-            }
-
-            return Ok();
         }
 
 
 
-        // POST: api/Products
-        [HttpPost("CreateProduct")]
-        public async Task<ActionResult<Product>> CreateProduct([FromBody] Product product)
+        [HttpPost]
+        public async Task<CreateProductResultDto> CreateProductByName(string name)
         {
-                Product product1 = new Product();
-
-                if (product1 == null)
-                {
-                    return StatusCode(404, "Products not found");
-                }
-
-                product1.ProductName = product.ProductName;
-                product1.ProductId = Guid.NewGuid();
-                product1.IsActive = true;
-                product1.CreatedBy = Environment.UserName;
-                product1.CreatedDate = DateTime.Now;
-                product1.CreatedIp = product.CreatedIp;
-                product1.IsDeleted = false;
-                product1.UpdatedIp = product.UpdatedIp;
-                product1.UpdatedDate = product.UpdatedDate;
-                product1.UpdatedBy = Environment.UserName;
-
-
-
+            var result = new CreateProductResultDto();
+            if (!ModelState.IsValid)
+            {
+                result.Status = "No Created";
+                result.Code = 400;
+                result.IsCreated = false;
+            }
             try
             {
-                _context.Products.Add(product1);
-                _context.SaveChanges();
-            }
 
-            catch(Exception)
-            {
-                return StatusCode(500, "Internal server error");
-
-            }
-
-            return Ok();
-         }
-
-        [HttpDelete("name")]
-        public async Task<ActionResult<Product>> DeleteProduct(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                _logger.LogError($"Name is empty ");
-            }
-
-            try
-            {
-                var p = _context.Products.FirstOrDefault(n => n.ProductName == name && n.IsActive==true);
-                if (p == null)
+                using (var _context = new ProductsDbContext())
                 {
-                    return StatusCode(404, "Products not found");
+                    Product product = new Product();
+
+                        product.ProductName = name;
+                        product.ProductId = Guid.NewGuid();
+                        product.IsActive = true;
+                        product.CreatedBy = Environment.UserName;
+                        product.CreatedDate = DateTime.Now;
+                        product.CreatedIp = Dns.GetHostName();
+                        product.IsDeleted = false;
+                    
+
+                        result.Status = "Created";
+                        result.Code = 201;
+                        result.IsCreated = true;
+                        _context.Products.Add(product);
+                        _context.SaveChanges();
+                    
                 }
-
-                p.IsActive = false;
-                _context.Entry(p).State = EntityState.Modified;
-                _context.Update(p);
-                _context.SaveChanges();
             }
-            catch
+
+            catch (Exception ex)
             {
-                return StatusCode(500, "An error has occured");
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                result.IsCreated = false;
+                _logger.LogError("[{1}]:Error in Create Product {2}.", DateTime.Now, ex.InnerException);
+
             }
 
-            return Ok();
+            return result;
         }
 
 
-        private bool ProductExists(string name)
+
+        [HttpDelete]
+        public async Task<DeleteProductResultDto> DeleteProductByName(string name)
         {
-            return (_context.Products?.Any(e => e.ProductName == name)).GetValueOrDefault();
+
+            var result = new DeleteProductResultDto();
+
+            if (!ModelState.IsValid)
+            {
+                result.Status = "No Deleted";
+                result.Code = 400;
+                result.IsDeleted = false;
+            }
+
+
+            try
+            {
+                using (var _context = new ProductsDbContext())
+                {
+
+                    var product = _context.Products.First(n => n.ProductName == name && n.IsActive == true);
+
+                    if (product != null)
+                    {
+                        product.IsActive = false;
+                        product.IsDeleted = true;
+
+                        result.Status = "Deleted";
+                        result.Code = 200;
+                        result.IsDeleted = true;
+                        _context.Entry(product).State = EntityState.Modified;
+                        _context.Products.Update(product);
+                        _context.SaveChanges();
+                    }
+
+                    else
+                    {
+                        result.Status = "No Deleted";
+                        result.Code = 400;
+                        result.IsDeleted = false;
+                    }
+
+                }
+
+            }
+
+
+            catch (Exception ex)
+            {
+                result.Status = ex.InnerException.ToString();
+                result.Code = 0;
+                result.IsDeleted = false;
+                _logger.LogError("[{1}]:Error in Delete Product {2}.", DateTime.Now, ex.InnerException);
+
+            }
+
+            return result;
         }
 
 
     }
-
 }
+
+
+

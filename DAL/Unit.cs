@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
-
+using System.ComponentModel.DataAnnotations;
 namespace BenchmarkAPI.DAL
 {
     public  class Unit
@@ -10,8 +10,11 @@ namespace BenchmarkAPI.DAL
         {
             ProductsSizeOptions = new HashSet<ProductsSizeOption>();
         }
-
+        [JsonIgnore]
         public Guid UnitId { get; set; }
+
+        [StringLength(50, MinimumLength = 3)]
+        [Required(ErrorMessage = "Please Enter Unit Name")]
         public string UnitName { get; set; } = null!;
         public string CreatedBy { get; set; } = Environment.UserName;
         [JsonIgnore]
@@ -29,7 +32,7 @@ namespace BenchmarkAPI.DAL
         [JsonIgnore]
         public bool? IsDeleted { get; set; }
 
-
+        [JsonIgnore]
         public ICollection<ProductsSizeOption> ProductsSizeOptions { get; set; }
     }
 }

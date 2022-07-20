@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json.Serialization;
-
+﻿using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations;
 namespace BenchmarkAPI.DAL
 {
     public  class Material
@@ -11,7 +9,11 @@ namespace BenchmarkAPI.DAL
             ProductsMaterialOptions = new HashSet<ProductsMaterialOption>();
         }
 
+        [JsonIgnore]
         public Guid MaterialId { get; set; }
+
+        [StringLength(50, MinimumLength = 3)]
+        [Required(ErrorMessage = "Please Enter Material Name")]
         public string MaterialName { get; set; } = null!;
         [JsonIgnore]
         public string CreatedBy { get; set; } = Environment.UserName;
@@ -30,7 +32,7 @@ namespace BenchmarkAPI.DAL
         [JsonIgnore]
         public bool? IsDeleted { get; set; }
 
-
+        [JsonIgnore]
         public ICollection<ProductsMaterialOption> ProductsMaterialOptions { get; set; }
     }
 }
